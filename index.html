@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LYNQUP | The Execution-First Platform</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        :root { --apple-bg: #f5f5f7; --apple-text: #1d1d1f; }
+        body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; overflow-x: hidden; scroll-behavior: smooth; }
+        
+        .glass-nav { background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(25px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); z-index: 1000; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100vh; z-index: 1; opacity: 0.5; pointer-events: none; }
+
+        /* Store Shelf Styling */
+        .shelf-container { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 40px 0; }
+        .shelf-container::-webkit-scrollbar { display: none; }
+        .creator-card {
+            flex: 0 0 320px; scroll-snap-align: start; background: #fff; border-radius: 2.5rem; padding: 2.5rem;
+            transition: all 0.8s cubic-bezier(0.2, 1, 0.3, 1); cursor: pointer; position: relative; overflow: hidden; height: 500px;
+            color: var(--apple-text); opacity: 0; transform: translateY(40px);
+        }
+        .creator-card.active { opacity: 1; transform: translateY(0); }
+        .creator-card:hover { transform: scale(1.03) translateY(-10px); box-shadow: 0 40px 80px rgba(0,0,0,0.2); }
+        .creator-card img { position: absolute; bottom: 0; right: 0; width: 100%; height: 80%; object-fit: cover; transition: 1.2s ease; mask-image: linear-gradient(to top, black 85%, transparent 100%); }
+
+        /* Typography & Reveals */
+        .section-title { font-size: clamp(2.5rem, 6vw, 5rem); font-weight: 600; letter-spacing: -0.04em; line-height: 1.05; }
+        .reveal { opacity: 0; transform: translateY(30px); transition: 1.2s cubic-bezier(0.2, 1, 0.3, 1); }
+        .reveal.active { opacity: 1; transform: translateY(0); }
+
+        /* Detail Boxes */
+        .detail-grid { border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); border-radius: 2.5rem; padding: 3rem; }
+        .stat-circle { border: 1px solid #333; border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #0071e3; margin-bottom: 1.5rem; }
+
+        /* Modals */
+        #profile-modal, #join-modal { display: none; position: fixed; inset: 0; z-index: 2000; align-items: flex-end; justify-content: center; background: rgba(0,0,0,0.6); backdrop-filter: blur(15px); }
+        .slide-up { animation: slideUp 0.8s cubic-bezier(0.2, 1, 0.3, 1); background: #fff; width: 100%; height: 92vh; border-radius: 3rem 3rem 0 0; padding: 4rem; color: #000; overflow-y: auto; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <nav class="fixed top-0 w-full glass-nav">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="text-2xl font-semibold tracking-tighter uppercase">LYNQUP</div>
+            <div class="hidden md:flex space-x-10 text-xs font-medium text-gray-400">
+                <a href="#logic" class="hover:text-white transition">The Logic</a>
+                <a href="#store" class="hover:text-white transition">Store</a>
+                <a href="#engine" class="hover:text-white transition">Engine</a>
+            </div>
+            <div class="flex items-center gap-6">
+                <a href="request.html" class="relative p-2 text-gray-400 hover:text-white transition">
+                    <i data-lucide="shopping-bag" class="w-6 h-6"></i>
+                    <span id="bag-count" class="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">0</span>
+                </a>
+                <button onclick="toggleJoinModal(true)" class="bg-white text-black px-6 py-2 rounded-full text-sm font-medium">Join as Creator</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- HERO SECTION -->
+    <section class="relative h-screen flex items-center justify-center overflow-hidden">
+        <div id="canvas-container"></div>
+        <div class="relative z-10 text-center max-w-5xl px-6">
+            <h1 class="section-title mb-8 reveal">Execution is the only <br> metric that matters.</h1>
+            <p class="text-xl md:text-2xl text-gray-400 font-light mb-12 max-w-3xl mx-auto leading-relaxed reveal">
+                LYNQUP replaces the chaos of fragmented chats with a single, structured system for elite event collaborations. Discover, book, and track in one flow.
+            </p>
+            <div class="flex flex-col md:flex-row gap-6 justify-center reveal">
+                <button onclick="document.getElementById('store').scrollIntoView()" class="bg-white text-black py-4 px-12 rounded-full text-lg font-medium hover:scale-105 transition">Browse Talent</button>
+                <button onclick="document.getElementById('logic').scrollIntoView()" class="border border-white/30 hover:bg-white/10 rounded-full px-12 py-4 text-lg transition">How it Works</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- THE LOGIC (The Problem) -->
+    <section id="logic" class="py-40 bg-white text-black">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid md:grid-cols-2 gap-24 items-center">
+                <div class="reveal">
+                    <h2 class="text-sm font-bold tracking-widest text-gray-400 uppercase mb-4">The Problem</h2>
+                    <h3 class="text-5xl font-semibold mb-8">Collaborations break <br> in the DMs.</h3>
+                    <p class="text-xl text-gray-600 leading-relaxed mb-10">
+                        Event production is currently buried in WhatsApp threads and spreadsheets. Details are lost, payments are delayed, and accountability is verbal. This is <b>Messaging Debt.</b>
+                    </p>
+                    <div class="space-y-8">
+                        <div class="flex gap-6">
+                            <div class="stat-circle">01</div>
+                            <div><h4 class="text-xl font-bold">Chaos to System</h4><p class="text-gray-500">Transform verbal agreements into verifiable milestones tracked by our execution engine.</p></div>
+                        </div>
+                        <div class="flex gap-6">
+                            <div class="stat-circle">02</div>
+                            <div><h4 class="text-xl font-bold">Discovery to Booking</h4><p class="text-gray-500">Browse a vetted shelf of talent, add them to your request, and send one unified brief.</p></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="detail-grid text-white reveal bg-black">
+                    <h4 class="text-2xl font-medium mb-6 italic">"Stop managing through hope. Start managing through architecture."</h4>
+                    <p class="text-gray-400 leading-relaxed">
+                        When you book through LYNQUP, the platform automatically generates GPS check-ins for on-site talent and content-hashing for creators. Funds are secured in escrow and released only upon delivery.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- THE STORE -->
+    <section id="store" class="py-40 bg-[#f5f5f7] text-black">
+        <div class="max-w-7xl mx-auto px-6 mb-16 reveal">
+            <h2 class="text-sm font-bold tracking-widest text-gray-400 uppercase mb-4">The Shelf</h2>
+            <h3 class="text-5xl font-semibold mb-4">Vetted Talent.</h3>
+            <p class="text-xl text-gray-500">Add elite creators and service providers to your event roster.</p>
+        </div>
+        <div class="pl-6 md:pl-[calc((100vw-1280px)/2)]">
+            <div id="creators-shelf" class="shelf-container gap-8 pr-12">
+                <!-- AI Avatars Placeholder logic remains inside fetchCreators -->
+                <div class="text-gray-400 animate-pulse">Scanning the network...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- THE ENGINE (Technical Details) -->
+    <section id="engine" class="py-40 bg-black text-white">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-24 reveal">
+                <h3 class="section-title">The Milestone Engine.</h3>
+                <p class="text-gray-500 text-xl mt-6">Guaranteed delivery through technical verification.</p>
+            </div>
+            <div class="grid md:grid-cols-3 gap-8 reveal">
+                <div class="detail-grid">
+                    <i data-lucide="map-pin" class="text-blue-500 mb-6"></i>
+                    <h5 class="text-xl font-bold mb-4">GPS Verification</h5>
+                    <p class="text-gray-500 text-sm">On-site talent payments are triggered by geo-located arrival and departure logs.</p>
+                </div>
+                <div class="detail-grid">
+                    <i data-lucide="shield-check" class="text-green-500 mb-6"></i>
+                    <h5 class="text-xl font-bold mb-4">Escrow Protection</h5>
+                    <p class="text-gray-500 text-sm">Funds are secured upfront, ensuring creators are paid and brands are protected.</p>
+                </div>
+                <div class="detail-grid">
+                    <i data-lucide="refresh-cw" class="text-orange-500 mb-6"></i>
+                    <h5 class="text-xl font-bold mb-4">Automated Workflow</h5>
+                    <p class="text-gray-500 text-sm">Status updates are pushed to all stakeholders the moment a milestone is executed.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Profile Modal -->
+    <div id="profile-modal" onclick="closeProfile()">
+        <div class="slide-up max-w-6xl mx-auto relative shadow-2xl" onclick="event.stopPropagation()">
+            <button onclick="closeProfile()" class="absolute top-10 right-10 p-3 bg-gray-100 rounded-full"><i data-lucide="x"></i></button>
+            <div class="grid md:grid-cols-2 gap-20 items-center">
+                <img id="m-img" src="" class="rounded-[3rem] w-full aspect-square object-cover shadow-2xl">
+                <div>
+                    <h2 id="m-name" class="text-7xl font-semibold mb-4 tracking-tighter"></h2>
+                    <p id="m-role" class="text-2xl text-gray-400 mb-10 font-light"></p>
+                    <div class="bg-gray-50 p-8 rounded-3xl mb-12">
+                        <p class="text-gray-500 leading-relaxed">This creator is a verified LYNQUP Execution Partner. Bookings include full milestone tracking and delivery insurance.</p>
+                    </div>
+                    <button id="add-btn" onclick="addToBag()" class="w-full py-6 bg-black text-white rounded-full text-xl font-bold shadow-xl active:scale-95 transition-all">Add to Request</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Join Modal -->
+    <div id="join-modal" onclick="toggleJoinModal(false)">
+        <div class="bg-white w-full max-w-xl rounded-[3rem] p-12 relative mx-6 shadow-2xl" onclick="event.stopPropagation()">
+            <button onclick="toggleJoinModal(false)" class="absolute top-8 right-8 text-gray-400"><i data-lucide="x"></i></button>
+            <h2 class="text-4xl font-semibold mb-4 text-black">Apply to Join.</h2>
+            <form id="creator-form" class="space-y-4 text-black">
+                <input type="text" name="name" placeholder="Full Name" class="w-full p-4 bg-gray-100 rounded-2xl outline-none" required>
+                <input type="text" name="role" placeholder="Role (e.g. Creative Lead)" class="w-full p-4 bg-gray-100 rounded-2xl outline-none" required>
+                <select name="category" class="w-full p-4 bg-gray-100 rounded-2xl outline-none"><option>DJs</option><option>Speakers</option><option>Creators</option></select>
+                <input type="text" name="price" placeholder="Starting Fee (e.g. 2,500)" class="w-full p-4 bg-gray-100 rounded-2xl outline-none" required>
+                <input type="url" name="image_url" placeholder="High-Res Photo URL" class="w-full p-4 bg-gray-100 rounded-2xl outline-none" required>
+                <button type="submit" id="submit-btn" class="w-full py-5 bg-black text-white rounded-2xl font-bold text-lg mt-4 shadow-lg">Submit Application</button>
+            </form>
+        </div>
+    </div>
+
+    <footer class="py-20 text-center bg-white text-gray-400 text-xs tracking-widest uppercase border-t border-gray-100">
+        © 2024 LYNQUP. Execution through Architecture.
+    </footer>
+
+    <script>
+        const SB_URL = "https://pljjbfzhdalaqkzvmrwr.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsampiZnpoZGFsYXFrenZtcndyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NTY2MzIsImV4cCI6MjA4MjUzMjYzMn0.sGik1UlAT-wg_q9HpFuMXRhxycR1wIX7zpdFwZg8DkI";
+        const lynqup = window.supabase.createClient(SB_URL, SB_KEY);
+
+        // 3D Particles
+        let mouseX = 0, mouseY = 0;
+        const init3D = () => {
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            const geometry = new THREE.BufferGeometry();
+            const verts = [];
+            for (let i=0; i<300; i++) verts.push(THREE.MathUtils.randFloatSpread(20), THREE.MathUtils.randFloatSpread(20), THREE.MathUtils.randFloatSpread(20));
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+            const points = new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0x888888, size: 0.05, transparent: true, opacity: 0.5 }));
+            scene.add(points); camera.position.z = 10;
+            const animate = () => {
+                requestAnimationFrame(animate); points.rotation.y += 0.0005;
+                points.position.x += (mouseX * 0.05 - points.position.x) * 0.05;
+                points.position.y += (-mouseY * 0.05 - points.position.y) * 0.05;
+                renderer.render(scene, camera);
+            }; animate();
+            window.addEventListener('mousemove', (e) => { mouseX=(e.clientX/window.innerWidth)*2-1; mouseY=(e.clientY/window.innerHeight)*2-1; });
+        };
+
+        // Bag Logic
+        let bag = JSON.parse(localStorage.getItem('lynqup_bag')) || [];
+        function updateBag() { document.getElementById('bag-count').innerText = bag.length; }
+        
+        function addToBag() {
+            const btn = document.getElementById('add-btn');
+            const item = { name: document.getElementById('m-name').innerText, role: document.getElementById('m-role').innerText, img: document.getElementById('m-img').src };
+            if (!bag.some(x => x.name === item.name)) {
+                bag.push(item);
+                localStorage.setItem('lynqup_bag', JSON.stringify(bag));
+                updateBag();
+                btn.innerText = "✓ Added"; btn.style.backgroundColor = "#34c759";
+                setTimeout(() => { closeProfile(); btn.innerText = "Add to Request"; btn.style.backgroundColor = "black"; }, 800);
+            }
+        }
+
+        async function fetchCreators() {
+            const shelf = document.getElementById('creators-shelf');
+            try {
+                const { data } = await lynqup.from('creators').select('*');
+                if (data && data.length > 0) {
+                    shelf.innerHTML = '';
+                    data.forEach((item, i) => {
+                        const card = document.createElement('div');
+                        card.className = 'creator-card'; card.style.transitionDelay = `${i*100}ms`;
+                        card.onclick = () => {
+                            document.getElementById('m-name').innerText = item.name;
+                            document.getElementById('m-role').innerText = item.role;
+                            document.getElementById('m-img').src = item.image_url;
+                            document.getElementById('profile-modal').style.display = 'flex';
+                            document.body.style.overflow = 'hidden';
+                        };
+                        card.innerHTML = `<div><span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">${item.category}</span><h3 class="text-2xl font-semibold mt-1">${item.name}</h3><p class="text-gray-400 text-sm">${item.role}</p></div><img src="${item.image_url}" onerror="this.src='https://via.placeholder.com/400x600'">`;
+                        shelf.appendChild(card);
+                        setTimeout(() => card.classList.add('active'), 100);
+                    });
+                }
+            } catch(e) {}
+        }
+
+        function toggleJoinModal(show) { document.getElementById('join-modal').style.display = show ? 'flex' : 'none'; document.body.style.overflow = show ? 'hidden' : 'auto'; }
+        function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; document.body.style.overflow = 'auto'; }
+
+        document.getElementById('creator-form').onsubmit = async (e) => {
+            e.preventDefault(); const fd = new FormData(e.target);
+            await lynqup.from('creators').insert([{ name: fd.get('name'), role: fd.get('role'), category: fd.get('category'), price: fd.get('price'), image_url: fd.get('image_url'), is_approved: false }]);
+            alert("Application Sent!"); toggleJoinModal(false); e.target.reset();
+        };
+
+        window.onload = () => {
+            lucide.createIcons(); init3D(); fetchCreators(); updateBag();
+            const obs = new IntersectionObserver((es) => es.forEach(e => { if (e.isIntersecting) e.target.classList.add('active'); }), { threshold: 0.1 });
+            document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+        };
+    </script>
+</body>
+</html>
